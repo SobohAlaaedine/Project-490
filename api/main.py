@@ -5,12 +5,14 @@ import pickle
 import numpy as np
 import os
 from sentence_transformers import SentenceTransformer
-import openai
+from openai import OpenAI  # ✅ NEW SDK STYLE
 
 app = FastAPI()
 
-openai.api_key = os.getenv("OPENAI_API_KEY")  # Set your key via environment
+# Load your environment key
+client = OpenAI(api_key=os.getenv("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"))  # ✅ NEW CLIENT INIT
 
+# Load SentenceTransformer and FAISS index
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 index = faiss.read_index("models/recipes_index.faiss")
 
@@ -36,18 +38,19 @@ def suggest_recipe(query: Query):
     )
 
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4o",  # Replace with correct model ID
+        response = client.chat.completions.create(
+            model="gpt-4o",  # ✅ Make sure this model is available to you
             messages=[
                 {"role": "system", "content": "You are a professional chef."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=400
         )
+
         return {
             "ingredients": query.ingredients,
             "top_titles": top_titles,
-            "instructions": response.choices[0].message["content"].strip()
+            "instructions": response.choices[0].message.content.strip()
         }
     except Exception as e:
         return {"error": str(e)}
