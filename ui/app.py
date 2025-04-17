@@ -1,7 +1,6 @@
 import os
 import json
 import requests
-import joblib
 import numpy as np
 import time
 import streamlit as st
@@ -10,7 +9,6 @@ from streamlit_lottie import st_lottie
 # -------------------------------
 # 1. PAGE CONFIGURATION
 # -------------------------------
-
 st.set_page_config(
     page_title="NourishAI Pro | Chef System",
     page_icon="👨‍🍳",
@@ -19,41 +17,17 @@ st.set_page_config(
 )
 
 # -------------------------------
-# 2. LOAD MODEL (CACHED)
-# -------------------------------
-@st.cache_resource
-def load_model():
-    file_id = '1tR6_8S-yISRKZR2QJ6BjU3A3V5HHUCm7'
-    destination = 'recipe_model.pkl'
-
-    if not os.path.exists(destination):
-        URL = f'https://drive.google.com/uc?id={file_id}'
-        session = requests.Session()
-        response = session.get(URL, stream=True)
-        if 'Content-Disposition' in response.headers:
-            with open(destination, 'wb') as f:
-                for chunk in response.iter_content(32768):
-                    f.write(chunk)
-
-    model_data = joblib.load(destination)
-    return {
-        "model": model_data["model"],
-        "vectorizer": model_data["vectorizer"],
-        "label_encoder": model_data["label_encoder"]
-    }
-
-model_data = load_model()
-
-# -------------------------------
-# 3. SESSION STATE
+# 2. SESSION STATE
 # -------------------------------
 if 'generate_clicked' not in st.session_state:
     st.session_state.generate_clicked = False
 if 'ingredients' not in st.session_state:
     st.session_state.ingredients = ""
+if 'recipe_response' not in st.session_state:
+    st.session_state.recipe_response = None
 
 # -------------------------------
-# 4. GLOBAL STYLING
+# 3. GLOBAL STYLING
 # -------------------------------
 st.markdown("""
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
@@ -148,7 +122,7 @@ div[data-testid="stTextArea"] label {
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# 5. HEADER
+# 4. HEADER
 # -------------------------------
 st.markdown("""
 <div style="text-align: center; padding: 1rem 0;">
@@ -158,7 +132,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# 6. LOAD LOTTIE FILES
+# 5. LOAD LOTTIE FILES
 # -------------------------------
 def load_lottie_file(filename):
     path = os.path.join(r"C:\Users\AUB\Documents\GitHub\EECE-490", filename)
@@ -174,7 +148,7 @@ lottie_data = load_lottie_file("Animation.json")
 lottie_data_2 = load_lottie_file("Animation1.json")
 
 # -------------------------------
-# 7. SHOW LOTTIE ANIMATION
+# 6. SHOW LOTTIE ANIMATION
 # -------------------------------
 def show_lottie_animation(animation_data, speed=1, height=300, width=300, key_suffix=""):
     if animation_data:
@@ -195,7 +169,7 @@ def show_lottie_animation(animation_data, speed=1, height=300, width=300, key_su
         st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------------
-# 8. LAYOUT
+# 7. LAYOUT
 # -------------------------------
 col_input, col_anim, col_output = st.columns([1, 0.8, 1])
 
@@ -214,6 +188,18 @@ with col_input:
         else:
             st.session_state.generate_clicked = True
             st.session_state.ingredients = ingredients
+            try:
+                with st.spinner("Calling NourishAI backend..."):
+                    response = requests.post(
+                        "http://localhost:8000/suggest",  # Update URL if deploying
+                        json={"ingredients": ingredients}
+                    )
+                    if response.status_code == 200:
+                        st.session_state.recipe_response = response.json()["recipe"]
+                    else:
+                        st.error("❌ Failed to get recipe from API.")
+            except Exception as e:
+                st.error(f"Error: {e}", icon="🚫")
 
     st.markdown("<hr style='border: none; height: 2px; background: var(--border);'>", unsafe_allow_html=True)
 
@@ -241,43 +227,22 @@ with col_anim:
     if st.session_state.generate_clicked and lottie_data_2:
         show_lottie_animation(lottie_data_2, key_suffix="2")
 
-# OUTPUT RECIPES
+# OUTPUT
 with col_output:
-    if st.session_state.generate_clicked:
-        with st.spinner("Analyzing ingredients and generating recipes..."):
-            time.sleep(1.2)
-            try:
-                X_input = model_data["vectorizer"].transform([st.session_state.ingredients]).toarray()
-                y_pred = model_data["model"].predict(X_input)
-                top3_indices = np.argsort(y_pred, axis=1)[0][-3:][::-1]
-                top3_recipes = model_data["label_encoder"].inverse_transform(top3_indices)
-                top3_scores = (y_pred[0][top3_indices] * 100).astype(int)
-
-                st.markdown(f"""
-                <div style="margin-bottom: 1rem; text-align: center;">
-                    <h2 style="font-size: 1.8rem; color: var(--text);">✨ RECOMMENDED RECIPES ✨</h2>
-                    <p class="big-text">For: <strong>{st.session_state.ingredients}</strong></p>
-                </div>
-                """, unsafe_allow_html=True)
-
-                for recipe_name, score in zip(top3_recipes, top3_scores):
-                    prep_time = np.random.randint(15, 60)
-                    card_html = f"""
-                    <div class="recipe-card">
-                        <h3>{recipe_name}</h3>
-                        <p class="big-text">🍳 <strong>{prep_time} minutes preparation</strong></p>
-                        <p class="big-text">⭐ <strong>{score}% ingredient match</strong></p>
-                        <div style="height: 20px; background: var(--primary);
-                                    width: {score}%; border-radius: 8px; margin: 1rem 0;"></div>
-                    </div>
-                    """
-                    st.markdown(card_html, unsafe_allow_html=True)
-
-            except Exception as e:
-                st.error(f"Analysis error: {str(e)}", icon="❌")
+    if st.session_state.recipe_response:
+        st.markdown(f"""
+        <div style="margin-bottom: 1rem; text-align: center;">
+            <h2 style="font-size: 1.8rem; color: var(--text);">✨ RECOMMENDED RECIPE ✨</h2>
+            <p class="big-text">For: <strong>{st.session_state.ingredients}</strong></p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown(
+            f"<div class='recipe-card'><div class='big-text'>{st.session_state.recipe_response}</div></div>",
+            unsafe_allow_html=True
+        )
 
 # -------------------------------
-# 9. SUPPRESS TENSORFLOW WARNINGS
+# 8. TENSORFLOW WARNING SUPPRESSION (if needed)
 # -------------------------------
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import logging
