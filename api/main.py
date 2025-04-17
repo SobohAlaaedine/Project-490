@@ -10,7 +10,7 @@ from openai import OpenAI  # ✅ NEW SDK STYLE
 app = FastAPI()
 
 # Load your environment key
-client = OpenAI(api_key=os.getenv("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"))  # ✅ NEW CLIENT INIT
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # ✅ NEW CLIENT INIT
 
 # Load SentenceTransformer and FAISS index
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
