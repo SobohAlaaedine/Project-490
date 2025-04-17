@@ -38,7 +38,7 @@ def suggest_recipe(query: Query):
 
     try:
         response = openai.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o mini",
             messages=[
                 {"role": "system", "content": "You are a professional chef."},
                 {"role": "user", "content": prompt}
