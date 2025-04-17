@@ -9,7 +9,7 @@ import openai
 app = FastAPI()
 
 # Set API key directly
-openai.api_key = "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"
+openai.api_key = "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"
 
 # Load FAISS index and titles
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
