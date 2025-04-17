@@ -1,67 +1,39 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-import faiss
-import pickle
-import numpy as np
-from sentence_transformers import SentenceTransformer
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import os
+import openai
 
+# Initialize FastAPI app
 app = FastAPI()
 
-# -------------------------------
-# Load FAISS index and titles
-# -------------------------------
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
-index = faiss.read_index("models/recipes_index.faiss")
+# SET YOUR API KEY HERE (REPLACE THIS WITH YOUR ACTUAL KEY)
+openai.api_key = "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"
 
-with open("models/titles.pkl", "rb") as f:
-    titles = pickle.load(f)
-
-# -------------------------------
-# Load T5 model locally
-# -------------------------------
-tokenizer = AutoTokenizer.from_pretrained("t5-small")
-model = AutoModelForSeq2SeqLM.from_pretrained("t5-small")
-
-# -------------------------------
-# Request body format
-# -------------------------------
+# Define request body structure
 class Query(BaseModel):
     ingredients: str
 
-# -------------------------------
-# Generation function
-# -------------------------------
-def generate_instructions(ingredients: str, top_titles: list[str]) -> str:
-    # Use the best title (top FAISS match)
-    selected_title = top_titles[0]
-    prompt = f"Ingredients: {ingredients}\nRecipe title: {selected_title}\nInstructions:"
-    
-    input_ids = tokenizer(prompt, return_tensors="pt").input_ids
-    output_ids = model.generate(input_ids, max_length=200, num_beams=4, early_stopping=True)
-    
-    generated_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
-    return generated_text.strip()
-
-# -------------------------------
-# Suggest endpoint
-# -------------------------------
+# Define the /suggest endpoint
 @app.post("/suggest")
 def suggest_recipe(query: Query):
-    # Step 1: Embed query and search
-    q = embedder.encode([query.ingredients], convert_to_numpy=True)
-    faiss.normalize_L2(q)
-    scores, ids = index.search(q, k=3)
+    prompt = f"Given the following ingredients: {query.ingredients}, provide a detailed recipe including the title and step-by-step instructions."
 
-    # Step 2: Get top titles
-    top_titles = [titles[i] for i in ids[0]]
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that provides cooking recipes."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=500
+        )
 
-    # Step 3: Generate step-by-step instructions
-    instructions = generate_instructions(query.ingredients, top_titles)
+        recipe = response['choices'][0]['message']['content'].strip()
 
-    return {
-        "ingredients": query.ingredients,
-        "top_titles": top_titles,
-        "instructions": instructions
-    }
+        return {
+            "ingredients": query.ingredients,
+            "recipe": recipe
+        }
+
+    except openai.error.OpenAIError as e:
+        return {"error": str(e)}
