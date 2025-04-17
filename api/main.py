@@ -3,15 +3,14 @@ from pydantic import BaseModel
 import faiss
 import pickle
 import numpy as np
+import os
 from sentence_transformers import SentenceTransformer
 import openai
 
 app = FastAPI()
 
-# Set API key directly
-openai.api_key = "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"
+openai.api_key = os.getenv("OPENAI_API_KEY")  # Set your key via environment
 
-# Load FAISS index and titles
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 index = faiss.read_index("models/recipes_index.faiss")
 
@@ -37,8 +36,8 @@ def suggest_recipe(query: Query):
     )
 
     try:
-        response = openai.chat.completions.create(
-            model="gpt-4o mini",
+        response = openai.ChatCompletion.create(
+            model="gpt-4o",  # Replace with correct model ID
             messages=[
                 {"role": "system", "content": "You are a professional chef."},
                 {"role": "user", "content": prompt}
@@ -48,7 +47,7 @@ def suggest_recipe(query: Query):
         return {
             "ingredients": query.ingredients,
             "top_titles": top_titles,
-            "instructions": response.choices[0].message.content.strip()
+            "instructions": response.choices[0].message["content"].strip()
         }
     except Exception as e:
         return {"error": str(e)}
