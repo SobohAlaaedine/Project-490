@@ -1,24 +1,33 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-import faiss
-import pickle
-import numpy as np
-import os
+import faiss, pickle, numpy as np, os
 from sentence_transformers import SentenceTransformer
-from openai import OpenAI  # ✅ NEW SDK STYLE
+from openai import AzureOpenAI
 
+# Azure OpenAI Settings
+endpoint = "https://aos08-m9r3fgwd-uaenorth.cognitiveservices.azure.com/"
+deployment = "gpt-4o"  # Your Azure deployment name
+api_version = "2024-12-01-preview"
+subscription_key = os.getenv("AZURE_OPENAI_KEY")
+
+# Init AzureOpenAI client
+client = AzureOpenAI(
+    api_version=api_version,
+    azure_endpoint=endpoint,
+    api_key=subscription_key,
+)
+
+# FastAPI init
 app = FastAPI()
 
-# Load your environment key
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))  # ✅ NEW CLIENT INIT
-
-# Load SentenceTransformer and FAISS index
+# Load model + FAISS index
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 index = faiss.read_index("models/recipes_index.faiss")
 
 with open("models/titles.pkl", "rb") as f:
     titles = pickle.load(f)
 
+# Query model
 class Query(BaseModel):
     ingredients: str
 
@@ -28,29 +37,20 @@ def suggest_recipe(query: Query):
     faiss.normalize_L2(q)
     scores, ids = index.search(q, k=5)
 
-    top_titles = [titles[i] for i in ids[0]]
-    ctx_titles = "\n".join(f"- {t}" for t in top_titles)
-
+    ctx_titles = "\n".join(f"- {titles[i]}" for i in ids[0])
     prompt = (
         f"I only have these ingredients: {query.ingredients}\n\n"
         f"The following recipe titles look relevant:\n{ctx_titles}\n\n"
-        f"Choose one and give me a recipe with clear step-by-step instructions using only the listed ingredients."
+        "Choose one and give me precise step-by-step instructions using ONLY the listed ingredients."
     )
 
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o",  # ✅ Make sure this model is available to you
-            messages=[
-                {"role": "system", "content": "You are a professional chef."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=400
-        )
+    response = client.chat.completions.create(
+        model=deployment,
+        messages=[
+            {"role": "system", "content": "You are an expert chef."},
+            {"role": "user", "content": prompt}
+        ],
+        max_tokens=300
+    )
 
-        return {
-            "ingredients": query.ingredients,
-            "top_titles": top_titles,
-            "instructions": response.choices[0].message.content.strip()
-        }
-    except Exception as e:
-        return {"error": str(e)}
+    return {"recipe": response.choices[0].message.content.strip()}
