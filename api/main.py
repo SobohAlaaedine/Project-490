@@ -11,10 +11,10 @@ from fastapi.middleware.cors import CORSMiddleware
 # ===========================
 app = FastAPI()
 
-# Enable CORS for Streamlit frontend
+# Allow connection from Streamlit frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Use ["http://localhost:8501"] for stricter control
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -23,21 +23,25 @@ app.add_middleware(
 # ===========================
 # Load FAISS & Recipe Data
 # ===========================
+LOCAL_PATH = "C:/Users/AUB/Desktop/EECE490"
+
 print("📦 Loading model and index...")
-index = faiss.read_index("recipes_index.faiss")
-with open("recipes_data.pkl", "rb") as f:
+index = faiss.read_index(f"{LOCAL_PATH}/recipes_index.faiss")
+
+with open(f"{LOCAL_PATH}/recipes_data.pkl", "rb") as f:
     rag_texts = pickle.load(f)
+
 model = SentenceTransformer("all-MiniLM-L6-v2")
-print("✅ Loaded")
+print("✅ Model and data loaded")
 
 # ===========================
-# Request Model
+# Request Schema
 # ===========================
 class Query(BaseModel):
     ingredients: str
 
 # ===========================
-# Recipe Suggestion Endpoint
+# Endpoint
 # ===========================
 @app.post("/suggest")
 def suggest_recipe(query: Query):
@@ -49,6 +53,6 @@ def suggest_recipe(query: Query):
     for i, idx in enumerate(ids[0]):
         recipe = rag_texts[idx]
         match = round(scores[0][i] * 100, 2)
-        results.append(f"Match: {match}%\n\n{recipe}")
+        results.append(f"✅ Match: {match}%\n\n{recipe}")
 
     return {"recipe": "\n\n\n".join(results)}
