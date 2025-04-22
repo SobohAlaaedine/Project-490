@@ -6,43 +6,33 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from fastapi.middleware.cors import CORSMiddleware
 
-# ===========================
-# Setup
-# ===========================
+# Setup app
 app = FastAPI()
 
-# Allow connection from Streamlit frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Use ["http://localhost:8501"] for stricter control
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ===========================
-# Load FAISS & Recipe Data
-# ===========================
-LOCAL_PATH = "C:/Users/AUB/Desktop/EECE490"
+# 🔁 New model path
+MODEL_PATH = "C:/Users/AUB/Desktop/Project-490/models"
 
-print("📦 Loading model and index...")
-index = faiss.read_index(f"{LOCAL_PATH}/recipes_index.faiss")
-
-with open(f"{LOCAL_PATH}/recipes_data.pkl", "rb") as f:
+# Load FAISS and data
+print("📦 Loading index and data...")
+index = faiss.read_index(f"{MODEL_PATH}/recipes_index.faiss")
+with open(f"{MODEL_PATH}/recipes_data.pkl", "rb") as f:
     rag_texts = pickle.load(f)
-
 model = SentenceTransformer("all-MiniLM-L6-v2")
-print("✅ Model and data loaded")
+print("✅ Model loaded.")
 
-# ===========================
-# Request Schema
-# ===========================
+# Input format
 class Query(BaseModel):
     ingredients: str
 
-# ===========================
 # Endpoint
-# ===========================
 @app.post("/suggest")
 def suggest_recipe(query: Query):
     q_embed = model.encode([query.ingredients], convert_to_numpy=True)
