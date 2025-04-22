@@ -1,8 +1,6 @@
 import os
 import json
 import requests
-import numpy as np
-import time
 import streamlit as st
 from streamlit_lottie import st_lottie
 
@@ -132,48 +130,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# 5. LOAD LOTTIE FILES
+# 5. INPUT + IMAGES SECTION
 # -------------------------------
-def load_lottie_file(filename):
-    path = os.path.join(r"C:\Users\AUB\Documents\GitHub\EECE-490", filename)
-    if os.path.exists(path):
-        try:
-            with open(path, "r") as f:
-                return json.load(f)
-        except:
-            return None
-    return None
+col_input, col_output = st.columns([1, 1])
 
-lottie_data = load_lottie_file("Animation.json")
-lottie_data_2 = load_lottie_file("Animation1.json")
-
-# -------------------------------
-# 6. SHOW LOTTIE ANIMATION
-# -------------------------------
-def show_lottie_animation(animation_data, speed=1, height=300, width=300, key_suffix=""):
-    if animation_data:
-        st.markdown(
-            f"""<div style="background-color:#FFFFFF; padding:1rem; border-radius:12px; text-align:center;">""",
-            unsafe_allow_html=True
-        )
-        st_lottie(
-            animation_data,
-            speed=speed,
-            reverse=False,
-            loop=True,
-            quality="high",
-            height=height,
-            width=width,
-            key=f"anim_{key_suffix}"
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
-
-# -------------------------------
-# 7. LAYOUT
-# -------------------------------
-col_input, col_anim, col_output = st.columns([1, 0.8, 1])
-
-# INPUT + IMAGES
 with col_input:
     ingredients = st.text_area(
         "ENTER INGREDIENTS (COMMA SEPARATED):",
@@ -191,18 +151,20 @@ with col_input:
             try:
                 with st.spinner("Calling NourishAI backend..."):
                     response = requests.post(
-                        "http://localhost:8000/suggest",  # Update URL if deploying
+                        "http://localhost:8000/suggest",  # Change if deployed
                         json={"ingredients": ingredients}
                     )
                     if response.status_code == 200:
                         st.session_state.recipe_response = response.json()["recipe"]
                     else:
-                        st.error("❌ Failed to get recipe from API.")
+                        st.error("❌ Failed to get recipe from backend.")
             except Exception as e:
                 st.error(f"Error: {e}", icon="🚫")
 
+    # Divider
     st.markdown("<hr style='border: none; height: 2px; background: var(--border);'>", unsafe_allow_html=True)
 
+    # Sample Images (optional)
     image_urls = [
         "https://images.unsplash.com/photo-1546069901-ba9599a7e63c",
         "https://images.unsplash.com/photo-1512621776951-a57141f2eefd",
@@ -220,14 +182,9 @@ with col_input:
                 </div>
                 """, unsafe_allow_html=True)
 
-# ANIMATIONS
-with col_anim:
-    if st.session_state.generate_clicked and lottie_data:
-        show_lottie_animation(lottie_data, key_suffix="1")
-    if st.session_state.generate_clicked and lottie_data_2:
-        show_lottie_animation(lottie_data_2, key_suffix="2")
-
-# OUTPUT
+# -------------------------------
+# 6. OUTPUT SECTION
+# -------------------------------
 with col_output:
     if st.session_state.recipe_response:
         st.markdown(f"""
@@ -240,10 +197,3 @@ with col_output:
             f"<div class='recipe-card'><div class='big-text'>{st.session_state.recipe_response}</div></div>",
             unsafe_allow_html=True
         )
-
-# -------------------------------
-# 8. TENSORFLOW WARNING SUPPRESSION (if needed)
-# -------------------------------
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import logging
-logging.getLogger('tensorflow').setLevel(logging.ERROR)
