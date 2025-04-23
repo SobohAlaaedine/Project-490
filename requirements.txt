@@ -9,3 +9,4 @@ numpy
 streamlit
 requests
 scikit-learn
+tensorflow
