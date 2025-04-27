@@ -123,7 +123,7 @@ with col_output:
             time.sleep(1.2)
             try:
                 response = requests.post(
-                    "http://0.0.0.0:8000/suggest",
+                    "http://localhost:8000", 
                     json={"ingredients": st.session_state.ingredients}
                 )
 
